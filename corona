@@ -6,13 +6,18 @@ usage() {
     echo "Useage: corona [-h] [FILTERS] [COMMAND] [LOG [LOG2 [...]]"
 }
 
-while getopts :a:b:g:hs opt;
-do  case "$opt" in
+while getopts :a:b:g:hs filter;
+do  case "$filter" in
         a)  echo "Option 'a' found with parameter '$OPTARG'.";;
         b)  echo "Option 'b' found with parameter '$OPTARG'.";;
         g)  echo "Option 'g' found with parameter '$OPTARG'.";;
         h)  usage;;
-        s)  echo "Option 's'.";;
+        s)  eval "OPTARG=\${$OPTIND}"
+            case "$OPTARG" in
+                [0-9])  ((OPTIND++));;
+                *)  OPTARG="";;
+            esac
+            echo "Option 's' found with parameter '$OPTARG'.";;
         *)  usage >&2
             exit 1;;
     esac
@@ -20,8 +25,10 @@ done
 
 ((OPTIND--))
 shift $OPTIND
+((OPTIND=1))
+eval "opt=\${$OPTIND}"
 
-case "$*" in
+case "$opt" in
     infected)  echo "Option 'infected' found.";;
     merge)  echo "Option 'merge' found.";;
     gender)  echo "Option 'gender' found.";;
@@ -32,6 +39,11 @@ case "$*" in
     countries)  echo "Option 'countries' found.";;
     districts)  echo "Option 'districts' found.";;
     regions)  echo "Option 'regions' found.";;
-    "") echo "No more arguments.";;
+    "") echo "No commands."
+        ((OPTIND--));;
+    *.csv | *.gz | *.bz2) file=$opt
+                        echo "Input file: '$file'"
     *) usage;;
 esac
+
+shift $OPTIND
