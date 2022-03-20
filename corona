@@ -14,7 +14,7 @@ do  case "$filter" in
         h)  usage;;
         s)  eval "OPTARG=\${$OPTIND}"
             case "$OPTARG" in
-                [0-9])  ((OPTIND++));;
+                [0-9]*)  ((OPTIND++));;
                 *)  OPTARG="";;
             esac
             echo "Option 's' found with parameter '$OPTARG'.";;
@@ -25,25 +25,30 @@ done
 
 ((OPTIND--))
 shift $OPTIND
-((OPTIND=1))
-eval "opt=\${$OPTIND}"
 
-case "$opt" in
-    infected)  echo "Option 'infected' found.";;
-    merge)  echo "Option 'merge' found.";;
-    gender)  echo "Option 'gender' found.";;
-    age)  echo "Option 'age' found.";;
-    daily)  echo "Option 'daily' found.";;
-    monthly)  echo "Option 'monthly' found.";;
-    yearly)  echo "Option 'yearly' found.";;
-    countries)  echo "Option 'countries' found.";;
-    districts)  echo "Option 'districts' found.";;
-    regions)  echo "Option 'regions' found.";;
-    "") echo "No commands."
-        ((OPTIND--));;
-    *.csv | *.gz | *.bz2) file=$opt
-                        echo "Input file: '$file'"
-    *) usage;;
-esac
+for (( OPTIND=1; $OPTIND <= $#; OPTIND++))
+do
+    eval "opt=\${$OPTIND}"
+    case "$opt" in
+        infected)  echo "Option 'infected' found.";;
+        merge)  echo "Option 'merge' found.";;
+        gender)  echo "Option 'gender' found.";;
+        age)  echo "Option 'age' found.";;
+        daily)  echo "Option 'daily' found.";;
+        monthly)  echo "Option 'monthly' found.";;
+        yearly)  echo "Option 'yearly' found.";;
+        countries)  echo "Option 'countries' found.";;
+        districts)  echo "Option 'districts' found.";;
+        regions)  echo "Option 'regions' found.";;
+        *.csv | *.gz | *.bz2) file=$opt
+                            echo "Input file: '$file'";
+        *) usage;;
+    esac
+done
 
-shift $OPTIND
+function write_on_stdout()
+{
+    cat $1 >&1
+}
+
+write_on_stdout $file
