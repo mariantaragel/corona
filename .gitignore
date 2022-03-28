@@ -1,1 +1,3 @@
-osoby.csv
+*.csv
+*.bz2
+*.gz

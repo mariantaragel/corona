@@ -1,25 +1,286 @@
-#!/bin/bash
+#! /usr/bin/bash
+
+# File: corona
+# Author: Marián Tarageľ
+# Date: 28.03.2022
+# Brief: Analyser of COVID-19 records
+# TODO: merge, validate_input, none, -s
 
 POSIXLY_CORRECT=yes
 
-usage() {
-    echo "Useage: corona [-h] [FILTERS] [COMMAND] [LOG [LOG2 [...]]"
+usage()
+{
+    echo "Useage: corona [-h] [FILTERS] [COMMAND] [LOG [LOG2 [...]]" >&2
+    exit 1
 }
 
-while getopts :a:b:g:hs filter;
-do  case "$filter" in
-        a)  echo "Option 'a' found with parameter '$OPTARG'.";;
-        b)  echo "Option 'b' found with parameter '$OPTARG'.";;
-        g)  echo "Option 'g' found with parameter '$OPTARG'.";;
-        h)  usage;;
-        s)  eval "OPTARG=\${$OPTIND}"
+filter_gender()
+{
+    INPUT=$(echo "$INPUT" | awk -F "," -v GENDER="$1" '$4 == GENDER {print $0}')
+}
+
+filter_date_after()
+{
+    INPUT=$(echo "$INPUT" | awk -F "," -v DATE="$1" '{
+        if(DATE <= $2) {
+            print $0
+        }
+    }')
+}
+
+filter_date_before()
+{
+    INPUT=$(echo "$INPUT" | awk -F "," -v DATE="$1" '{
+        if(DATE >= $2) {
+            print $0
+        }
+    }')
+}
+
+infected()
+{
+    COUNT_INFECTED=$(echo "$INPUT" | wc -l)
+    echo "$COUNT_INFECTED"
+    exit 0
+}
+
+merge()
+{
+    INPUT=$(echo "$INPUT" | sort $4 | uniq -u)
+}
+
+gender()
+{
+    MEN_INFECTED=$(echo "$INPUT" | awk -F "," '$4 == "M" {print $0}' | wc -l)
+    WOMEN_INFECTED=$(echo "$INPUT" | awk -F "," '$4 == "Z" {print $0}' | wc -l)
+    echo "M: $MEN_INFECTED"
+    echo "Z: $WOMEN_INFECTED"
+    exit 0
+}
+
+age()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," '{
+            if(0 <= $3 && $3 <= 5) {
+                count1++;
+            }
+            else if(6 <= $3 && $3 <= 15) {
+                count2++;
+            }
+            else if(16 <= $3 && $3 <= 25) {
+                count3++;
+            }
+            else if(26 <= $3 && $3 <= 35) {
+                count4++;
+            }
+            else if(36 <= $3 && $3 <= 45) {
+                count5++;
+            }
+            else if(46 <= $3 && $3 <= 55) {
+                count6++;
+            }
+            else if(56 <= $3 && $3 <= 65) {
+                count7++;
+            }
+            else if(66 <= $3 && $3 <= 75) {
+                count8++;
+            }
+            else if(76 <= $3 && $3 <= 85) {
+                count9++;
+            }
+            else if(86 <= $3 && $3 <= 95) {
+                count10++;
+            }
+            else if(96 <= $3 && $3 <= 105) {
+                count11++;
+            }
+            else if($3 >= 105) {
+                count12++;
+            }
+            else {
+                count13++;
+            }
+        }
+        END {
+            print "0-5\t: " count1;
+            print "6-15\t: " count2;
+            print "16-25\t: " count3;
+            print "26-35\t: " count4;
+            print "36-45\t: " count5;
+            print "46-55\t: " count6;
+            print "56-65\t: " count7;
+            print "66-75\t: " count8;
+            print "76-85\t: " count9;
+            print "86-95\t: " count10;
+            print "96-105\t: " count11;
+            print ">105\t: " count12;
+            print "None\t: " count13;
+        }
+    '
+    exit 0
+}
+
+daily()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," '
+        BEGIN { before="2020-03-01"; }
+        {
+            if (before != $2) {
+                print before": "count;
+                before=$2;
+                count=1;
+            }
+            else {
+                count++;
+            }
+        }
+        END { print before": "count; }
+    '
+    exit 0
+}
+
+monthly()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," '
+        BEGIN { before="2020-03"; }
+        {
+            if (before == substr($2, 1, 7)) {
+                count++;
+            }
+            else {
+                print before": "count;
+                count=1;
+                before=substr($2, 1, 7);
+            }
+        }
+        END { print before": "count; }
+    '
+     exit 0
+}
+
+yearly()
+{
+    echo "$INPUT" | sed '1d' | awk -F -v GRAPH "," '
+        BEGIN { before="2020"; }
+        {
+            if (before == substr($2, 1, 4)) {
+                count++;
+            }
+            else {
+                print before": "count;
+                count=1;
+                before=substr($2, 1, 4);
+            }
+        }
+        END { print before": "count; }
+    '
+     exit 0
+}
+
+countries()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," '
+        {
+            countries[$8] += 1;
+        }
+        END {
+            for (i in countries) {
+                if (i == "CZ") {
+                    continue;
+                }
+                else if (i == "") {
+                    print "None: "countries[i];
+                }
+                else {
+                    print i": "countries[i];
+                }
+            }
+        }
+    ' | sort
+    exit 0
+}
+
+districts()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," '
+        {
+            districts[$6] += 1;
+        }
+        END {
+            for (i in districts) {
+                if (i == "") {
+                    print "None: "districts[i];
+                }
+                else {
+                    print i": "districts[i];
+                }
+            }
+        }
+    ' | sort
+    exit 0
+}
+
+
+regions()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," '
+        {
+            regions[$5] += 1;
+        }
+        END {
+            for (i in regions) {
+                if (i == "") {
+                    print "None: "regions[i];
+                }
+                else {
+                    print i": "regions[i];
+                }
+            }
+        }
+    ' | sort
+    exit 0
+}
+
+validate_input()
+{
+    INPUT=$(echo "$INPUT" | sed '/^[[:space:]]*$/d' | sed 's/ //g')
+}
+
+for (( OPTIND=1; $OPTIND <= $#; OPTIND++))
+do
+    eval "OPT=\${$OPTIND}"
+    case $OPT in
+        *.gz) GZ_FILES=$OPT
+            INPUT=$(zcat $GZ_FILES);;
+        *.bz2) BZ2_FILES=$OPT
+            INPUT=$(bzcat $BZ2_FILES);;
+        *.csv) CSV_FILES=$OPT
+            INPUT=$(cat $CSV_FILES);;
+        -h) usage;;
+        *) continue;;
+    esac
+done
+if [[ "$INPUT" == "" ]];
+    then INPUT=$(cat)
+fi
+
+OPTIND=1
+validate_input
+
+while getopts :a:b:g:hs FILTER;
+do  case "$FILTER" in
+        a) filter_date_after $OPTARG;;
+        b) filter_date_before $OPTARG;;
+        g) filter_gender $OPTARG;;
+        h) usage;;
+        s) eval "OPTARG=\${$OPTIND}"
             case "$OPTARG" in
                 [0-9]*)  ((OPTIND++));;
                 *)  OPTARG="";;
             esac
-            echo "Option 's' found with parameter '$OPTARG'.";;
-        *)  usage >&2
-            exit 1;;
+            GRAPH=1
+            WIDTH=$OPTARG;;
+        *) usage;;
     esac
 done
 
@@ -28,27 +289,23 @@ shift $OPTIND
 
 for (( OPTIND=1; $OPTIND <= $#; OPTIND++))
 do
-    eval "opt=\${$OPTIND}"
-    case "$opt" in
-        infected)  echo "Option 'infected' found.";;
-        merge)  echo "Option 'merge' found.";;
-        gender)  echo "Option 'gender' found.";;
-        age)  echo "Option 'age' found.";;
-        daily)  echo "Option 'daily' found.";;
-        monthly)  echo "Option 'monthly' found.";;
-        yearly)  echo "Option 'yearly' found.";;
-        countries)  echo "Option 'countries' found.";;
-        districts)  echo "Option 'districts' found.";;
-        regions)  echo "Option 'regions' found.";;
-        *.csv | *.gz | *.bz2) file=$opt
-                            echo "Input file: '$file'";
+    eval "OPT=\${$OPTIND}"
+    case "$OPT" in
+        infected) infected;;
+        merge) merge;;
+        gender) gender;;
+        age) age;;
+        daily) daily;;
+        monthly) monthly;;
+        yearly) yearly;;
+        countries) countries;;
+        districts) districts;;
+        regions)  regions;;
+        *.csv | *.gz | *.bz2) ;;
         *) usage;;
     esac
 done
 
-function write_on_stdout()
-{
-    cat $1 >&1
-}
+echo "$INPUT"
 
-write_on_stdout $file
+exit 0
