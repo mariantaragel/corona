@@ -2,9 +2,9 @@
 
 # File: corona
 # Author: Marián Tarageľ
-# Date: 28.03.2022
+# Date: 29.03.2022
 # Brief: Analyser of COVID-19 records
-# TODO: merge, validate_input, none, -s
+# TODO: merge, none, head, -s
 
 POSIXLY_CORRECT=yes
 
@@ -39,14 +39,14 @@ filter_date_before()
 
 infected()
 {
-    COUNT_INFECTED=$(echo "$INPUT" | wc -l)
+    COUNT_INFECTED=$(echo "$INPUT" | sed '1d' | wc -l)
     echo "$COUNT_INFECTED"
     exit 0
 }
 
 merge()
 {
-    INPUT=$(echo "$INPUT" | sort $4 | uniq -u)
+    INPUT=$(echo "$INPUT" | sort -t "," -k 4 | uniq -u)
 }
 
 gender()
@@ -122,7 +122,7 @@ age()
 
 daily()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," '
+    echo "$INPUT" | sed '1d' | sort -t "," -k 2 | awk -F "," '
         BEGIN { before="2020-03-01"; }
         {
             if (before != $2) {
@@ -141,7 +141,7 @@ daily()
 
 monthly()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," '
+    echo "$INPUT" | sed '1d' | sort -t "," -k 2 | awk -F "," '
         BEGIN { before="2020-03"; }
         {
             if (before == substr($2, 1, 7)) {
@@ -160,7 +160,7 @@ monthly()
 
 yearly()
 {
-    echo "$INPUT" | sed '1d' | awk -F -v GRAPH "," '
+    echo "$INPUT" | sed '1d' | sort -t "," -k 2 | awk -F -v GRAPH "," '
         BEGIN { before="2020"; }
         {
             if (before == substr($2, 1, 4)) {
@@ -243,7 +243,44 @@ regions()
 
 validate_input()
 {
-    INPUT=$(echo "$INPUT" | sed '/^[[:space:]]*$/d' | sed 's/ //g')
+    INPUT=$(echo "$INPUT" | sed '/^[[:space:]]*$/d' | sed 's/ //g' |
+    awk -F "," '{
+        month=substr($2, 6, 7);
+        day=substr($2, 9, 10);
+        if ($2 == "datum" && $3 == "vek") {print;}
+        else if ($3 ~ /^[0-9]*$/) {
+            if ((substr($2, 1, 5) ~ /202[0-2]-/) && (substr($2, 6, 8) ~ /0[1-9]|1[0-2]-/)) {
+                if (month ~ /0[1,3,5,7,8]|1[0,2]/ &&
+                    day ~ /0[1-9]|1[0-9]|2[0-9]|3[0-1]/) {
+                        print;
+                }
+                else if (month ~ /0[4,6,9]|11/ &&
+                    day ~ /0[1-9]|1[0-9]|2[0-9]|30/) {
+                        print;
+                }
+                else if (month ~ /02/) {
+                    if (substr($2, 1, 4) ~ /2020/ && day ~ /0[1-9]|1[0-9]|2[0-9]/) {
+                        print;
+                    }
+                    else if (day ~ /0[1-9]|1[0-9]|2[0-8]/) {
+                        print;
+                    }
+                    else {
+                        print "Invalid date: "$0 | "cat 1>&2";
+                    }
+                }
+                else {
+                    print "Invalid date: "$0 | "cat 1>&2";
+                }
+            }
+            else {
+                print "Invalid date: "$0 | "cat 1>&2";
+            }
+        }
+        else {
+            print "Invalid age: "$0 | "cat 1>&2";
+        }
+    }')
 }
 
 for (( OPTIND=1; $OPTIND <= $#; OPTIND++))
