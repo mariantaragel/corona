@@ -4,13 +4,32 @@
 # Author: Marián Tarageľ
 # Date: 29.03.2022
 # Brief: Analyser of COVID-19 records
-# TODO: merge, none, head, -s
+# TODO: merge, head filters
 
 POSIXLY_CORRECT=yes
 
 usage()
 {
-    echo "Useage: corona [-h] [FILTERS] [COMMAND] [LOG [LOG2 [...]]" >&2
+    echo "Useage: corona [-h] [FILTERS] [COMMAND] [LOG [LOG2 [...]]
+    COMMAND může být jeden z:
+        infected - spočítá počet nakažených
+        merge - sloučí několik souborů se záznamy do jednoho, zachovávající původní pořadí
+        gender - vypíše počet nakažených pro jednotlivá pohlaví
+        age - vypíše statistiku počtu nakažených osob dle věku
+        daily - vypíše statistiku nakažených osob pro jednotlivé dny
+        monthly - vypíše statistiku nakažených osob pro jednotlivé měsíce
+        yearly - vypíše statistiku nakažených osob pro jednotlivé roky
+        countries - vypíše statistiku nakažených osob pro jednotlivé země nákazy
+        districts - vypíše statistiku nakažených osob pro jednotlivé okresy
+        regions - vypíše statistiku nakažených osob pro jednotlivé kraje
+
+    FILTERS může být kombinace následujících:
+        -a DATETIME - after: jsou uvažovány pouze záznamy PO tomto datu. DATETIME je formátu YYYY-MM-DD
+        -b DATETIME - before: jsou uvažovány pouze záznamy PŘED tímto datem
+        -g GENDER - jsou uvažovány pouze záznamy nakažených osob daného pohlaví. GENDER může být M (muži) nebo Z (ženy).
+        -s [WIDTH] - u příkazů gender, age, daily, monthly, yearly, countries, districts a regions vypisuje data ne číselně, ale graficky v podobě histogramů. Nepovinný parametr WIDTH nastavuje šířku histogramů, tedy délku nejdelšího řádku, na WIDTH. Tedy, WIDTH musí být kladné celé číslo.
+    
+    -h - vypíše nápovědu s krátkým popisem každého příkazu a přepínače"
     exit 1
 }
 
@@ -139,6 +158,47 @@ daily()
     exit 0
 }
 
+daily_graphic()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+        {
+            day=substr($2, 1, 10);
+            days[day] += 1;
+        }
+        END {
+            if (width == "") {
+                for (i in days) {
+                    printf i": ";
+                    modulo = days[i] % 500;
+                    graphic = int((days[i] - modulo)/500);
+                    for (i=0; i < graphic; i++) {
+                        printf "#";
+                    }
+                    printf "\n";
+                }
+            }
+            else {
+                max = 0;
+                for (i in days) {
+                    if (days[i] > max) {
+                        max = days[i];
+                    }
+                }
+                for (i in days) {
+                    printf i": ";
+                    ratio = max / days[i];
+                    graphic = int(width / ratio);
+                    for (i=0; i < graphic; i++) {
+                        printf "#";
+                    }
+                    printf "\n";
+                }
+            }
+        }
+    ' | sort
+     exit 0
+}
+
 monthly()
 {
     echo "$INPUT" | sed '1d' | sort -t "," -k 2 | awk -F "," '
@@ -158,9 +218,50 @@ monthly()
      exit 0
 }
 
+monthly_graphic()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+        {
+            month=substr($2, 1, 7);
+            months[month] += 1;
+        }
+        END {
+            if (width == "") {
+                for (i in months) {
+                    printf i": ";
+                    modulo = months[i] % 10000;
+                    graphic = int((months[i] - modulo)/10000);
+                    for (i=0; i < graphic; i++) {
+                        printf "#";
+                    }
+                    printf "\n";
+                }
+            }
+            else {
+                max = 0;
+                for (i in months) {
+                    if (months[i] > max) {
+                        max = months[i];
+                    }
+                }
+                for (i in months) {
+                    printf i": ";
+                    ratio = max / months[i];
+                    graphic = int(width / ratio);
+                    for (i=0; i < graphic; i++) {
+                        printf "#";
+                    }
+                    printf "\n";
+                }
+            }
+        }
+    ' | sort
+     exit 0
+}
+
 yearly()
 {
-    echo "$INPUT" | sed '1d' | sort -t "," -k 2 | awk -F -v GRAPH "," '
+    echo "$INPUT" | sed '1d' | sort -t "," -k 2 | awk -F "," '
         BEGIN { before="2020"; }
         {
             if (before == substr($2, 1, 4)) {
@@ -174,6 +275,47 @@ yearly()
         }
         END { print before": "count; }
     '
+     exit 0
+}
+
+yearly_graphic()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+        {
+            year=substr($2, 1, 4);
+            years[year] += 1;
+        }
+        END {
+            if (width == "") {
+                for (i in years) {
+                    printf i": ";
+                    modulo = years[i] % 100000;
+                    graphic = int((years[i] - modulo)/100000);
+                    for (i=0; i < graphic; i++) {
+                        printf "#";
+                    }
+                    printf "\n";
+                }
+            }
+            else {
+                max = 0;
+                for (i in years) {
+                    if (years[i] > max) {
+                        max = years[i];
+                    }
+                }
+                for (i in years) {
+                    printf i": ";
+                    ratio = max / years[i];
+                    graphic = int(width / ratio);
+                    for (i=0; i < graphic; i++) {
+                        printf "#";
+                    }
+                    printf "\n";
+                }
+            }
+        }
+    ' | sort
      exit 0
 }
 
@@ -200,6 +342,74 @@ countries()
     exit 0
 }
 
+countries_graphic()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+        {
+            countries[$8] += 1;
+        }
+        END {
+            if (width == "") {
+                for (i in countries) {
+                    if (i == "CZ") {
+                        continue;
+                    }
+                    else if (i == "") {
+                        printf "None: ";
+                        modulo = countries[i] % 100;
+                        graphic = int((countries[i] - modulo)/100);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                    else {
+                        printf i": ";
+                        modulo = countries[i] % 100;
+                        graphic = int((countries[i] - modulo)/100);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                }
+            }
+            else {
+                max = 0;
+                for (i in countries) {
+                    if (countries[i] > max) {
+                        max = countries[i];
+                    }
+                }
+                for (i in countries) {
+                    if (i == "CZ") {
+                        continue;
+                    }
+                    else if (i == "") {
+                        printf "None: ";
+                        ratio = max / countries[i];
+                        graphic = int(width / ratio);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                    else{
+                        printf i": ";
+                        ratio = max / countries[i];
+                        graphic = int(width / ratio);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                }
+            }
+        }
+    ' | sort
+     exit 0
+}
+
 districts()
 {
     echo "$INPUT" | sed '1d' | awk -F "," '
@@ -220,6 +430,67 @@ districts()
     exit 0
 }
 
+districts_graphic()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+        {
+            districts[$6] += 1;
+        }
+        END {
+            if (width == "") {
+                for (i in districts) {
+                    if (i == "") {
+                        printf "None: ";
+                        modulo = districts[i] % 1000;
+                        graphic = int((districts[i] - modulo)/1000);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                    else {
+                        printf i": ";
+                        modulo = districts[i] % 1000;
+                        graphic = int((districts[i] - modulo)/1000);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                }
+            }
+            else {
+                max = 0;
+                for (i in districts) {
+                    if (districts[i] > max) {
+                        max = districts[i];
+                    }
+                }
+                for (i in districts) {
+                    if (i == "") {
+                        printf "None: ";
+                        ratio = max / districts[i];
+                        graphic = int(width / ratio);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                    else{
+                        printf i": ";
+                        ratio = max / districts[i];
+                        graphic = int(width / ratio);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                }
+            }
+        }
+    ' | sort
+     exit 0
+}
 
 regions()
 {
@@ -239,6 +510,68 @@ regions()
         }
     ' | sort
     exit 0
+}
+
+regions_graphic()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+        {
+            regions[$5] += 1;
+        }
+        END {
+            if (width == "") {
+                for (i in regions) {
+                    if (i == "") {
+                        printf "None: ";
+                        modulo = regions[i] % 10000;
+                        graphic = int((regions[i] - modulo)/10000);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                    else {
+                        printf i": ";
+                        modulo = regions[i] % 10000;
+                        graphic = int((regions[i] - modulo)/10000);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                }
+            }
+            else {
+                max = 0;
+                for (i in regions) {
+                    if (regions[i] > max) {
+                        max = regions[i];
+                    }
+                }
+                for (i in regions) {
+                    if (i == "") {
+                        printf "None: ";
+                        ratio = max / regions[i];
+                        graphic = int(width / ratio);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                    else{
+                        printf i": ";
+                        ratio = max / regions[i];
+                        graphic = int(width / ratio);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                }
+            }
+        }
+    ' | sort
+     exit 0
 }
 
 validate_input()
@@ -315,9 +648,9 @@ do  case "$FILTER" in
                 [0-9]*)  ((OPTIND++));;
                 *)  OPTARG="";;
             esac
-            GRAPH=1
+            GRAPH="true"
             WIDTH=$OPTARG;;
-        *) usage;;
+        *) usage >&2;;
     esac
 done
 
@@ -331,15 +664,43 @@ do
         infected) infected;;
         merge) merge;;
         gender) gender;;
-        age) age;;
-        daily) daily;;
-        monthly) monthly;;
-        yearly) yearly;;
-        countries) countries;;
-        districts) districts;;
-        regions)  regions;;
+        age) if [ -n "$GRAPH" ]; then
+                daily_graphic $WIDTH
+            else
+                daily
+            fi;;
+        daily) if [ -n "$GRAPH" ]; then
+                    daily_graphic $WIDTH
+                else
+                    daily
+                fi;;
+        monthly) if [ -n "$GRAPH" ]; then
+                    monthly_graphic $WIDTH
+                else
+                    monthly
+                fi;;
+        yearly) if [ -n "$GRAPH" ]; then
+                    yearly_graphic $WIDTH
+                else
+                    yearly
+                fi;;
+        countries) if [ -n "$GRAPH" ]; then
+                    countries_graphic $WIDTH
+                else
+                    countries
+                fi;;
+        districts) if [ -n "$GRAPH" ]; then
+                    districts_graphic $WIDTH
+                else
+                    districts
+                fi;;
+        regions)  if [ -n "$GRAPH" ]; then
+                    regions_graphic $WIDTH
+                else
+                    regions
+                fi;;
         *.csv | *.gz | *.bz2) ;;
-        *) usage;;
+        *) usage >&2;;
     esac
 done
 
