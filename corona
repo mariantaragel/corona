@@ -34,14 +34,21 @@ usage()
 
 filter_gender()
 {
-    INPUT=$(echo "$INPUT" | awk -F "," -v GENDER="$1" '$4 == GENDER {print $0}')
+    INPUT=$(echo "$INPUT" | awk -F "," -v GENDER="$1" '{
+        if (NR == 1) {
+            print $0;
+        }
+        if ($4 == GENDER) {
+            print $0;
+        }
+    }')
 }
 
 filter_date_after()
 {
     INPUT=$(echo "$INPUT" | awk -F "," -v DATE="$1" '{
         if(DATE <= $2) {
-            print $0
+            print $0;
         }
     }')
 }
@@ -50,7 +57,7 @@ filter_date_before()
 {
     INPUT=$(echo "$INPUT" | awk -F "," -v DATE="$1" '{
         if(DATE >= $2) {
-            print $0
+            print $0;
         }
     }')
 }
@@ -64,7 +71,11 @@ infected()
 
 merge()
 {
-    INPUT=$(echo "$INPUT" | sort -t "," -k 4 | uniq -u)
+    INPUT=$(echo "$INPUT" | sed '1d')
+    echo "id,datum,vek,pohlavi,kraj_nuts_kod,okres_lau_kod,nakaza_v_zahranici,nakaza_zeme_csu_kod,reportovano_khs"
+    if [ -n "$INPUT" ]; then
+        echo "$INPUT"
+    fi
 }
 
 gender()
@@ -132,7 +143,7 @@ gender_graphic()
 
 age()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$1 -v width=$2 '{
+    echo "$INPUT" | sed '1d' | awk -F "," -v graph="$1" -v width=$2 '{
             if(0 <= $3 && $3 <= 5) {
                 age["0-5"] += 1;
             }
@@ -694,16 +705,16 @@ validate_input()
     }')
 }
 
-for (( OPTIND=1; $OPTIND <= $#; OPTIND++))
+for (( OPTIND=1; OPTIND <= $#; OPTIND++))
 do
     eval "OPT=\${$OPTIND}"
     case $OPT in
         *.gz) GZ_FILES=$OPT
-            INPUT=$(zcat $GZ_FILES);;
+            INPUT=$(zcat "$GZ_FILES");;
         *.bz2) BZ2_FILES=$OPT
-            INPUT=$(bzcat $BZ2_FILES);;
+            INPUT=$(bzcat "$BZ2_FILES");;
         *.csv) CSV_FILES=$OPT
-            INPUT=$(cat $CSV_FILES);;
+            INPUT=$(cat "$CSV_FILES");;
         -h) usage
             exit 0;;
         *) continue;;
@@ -743,7 +754,7 @@ done
 ((OPTIND--))
 shift $OPTIND
 
-for (( OPTIND=1; $OPTIND <= $#; OPTIND++))
+for (( OPTIND=1; OPTIND <= $#; OPTIND++))
 do
     eval "OPT=\${$OPTIND}"
     case "$OPT" in
@@ -791,6 +802,6 @@ do
     esac
 done
 
-echo "$INPUT"
+merge
 
 exit 0

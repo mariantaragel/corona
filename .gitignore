@@ -1,3 +1,5 @@
 *.csv
 *.bz2
 *.gz
+*.txt
+*.py
