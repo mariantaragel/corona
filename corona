@@ -2,9 +2,9 @@
 
 # File: corona
 # Author: Marián Tarageľ
-# Date: 29.03.2022
+# Date: 30.03.2022
 # Brief: Analyser of COVID-19 records
-# TODO: merge, head filters
+# TODO: merge, validate
 
 POSIXLY_CORRECT=yes
 
@@ -27,10 +27,9 @@ usage()
         -a DATETIME - after: jsou uvažovány pouze záznamy PO tomto datu. DATETIME je formátu YYYY-MM-DD
         -b DATETIME - before: jsou uvažovány pouze záznamy PŘED tímto datem
         -g GENDER - jsou uvažovány pouze záznamy nakažených osob daného pohlaví. GENDER může být M (muži) nebo Z (ženy).
-        -s [WIDTH] - u příkazů gender, age, daily, monthly, yearly, countries, districts a regions vypisuje data ne číselně, ale graficky v podobě histogramů. Nepovinný parametr WIDTH nastavuje šířku histogramů, tedy délku nejdelšího řádku, na WIDTH. Tedy, WIDTH musí být kladné celé číslo.
+        -s [WIDTH] - u příkazů gender, age, daily, monthly, yearly, countries, districts a regions vypisuje data ne číselně, ale graficky v podobě histogramů. Nepovinný parametr WIDTH nastavuje šířku histogramů, tedy délku nejdelšího řádku, na WIDTH.
     
     -h - vypíše nápovědu s krátkým popisem každého příkazu a přepínače"
-    exit 1
 }
 
 filter_gender()
@@ -70,72 +69,148 @@ merge()
 
 gender()
 {
-    MEN_INFECTED=$(echo "$INPUT" | awk -F "," '$4 == "M" {print $0}' | wc -l)
-    WOMEN_INFECTED=$(echo "$INPUT" | awk -F "," '$4 == "Z" {print $0}' | wc -l)
-    echo "M: $MEN_INFECTED"
-    echo "Z: $WOMEN_INFECTED"
+    echo "$INPUT" | sed '1d' | awk -F "," '
+    {
+        if ($4 == "M") {
+            men++;
+        }
+        else if ($4 == "Z") {
+            women++;
+        }
+        else {
+            none++;
+        }
+    }
+    END {
+        print "M: "men;
+        print "Z: "women;
+        if (none != 0) {
+            print "None: "none;
+        }
+    }'
+    exit 0
+}
+
+gender_graphic()
+{
+    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
+    {
+        gender[$4] += 1;
+    }
+    END {
+        if (width == "") {
+            for (i in gender) {
+                printf i": ";
+                modulo = gender[i] % 100000;
+                graphic = int((gender[i] - modulo)/100000);
+                for (i=0; i < graphic; i++) {
+                    printf "#";
+                }
+                printf "\n";
+            }
+        }
+        else {
+            max = 0;
+            for (i in gender) {
+                if (gender[i] > max) {
+                    max = gender[i];
+                }
+            }
+            for (i in gender) {
+                printf i": ";
+                ratio = max / gender[i];
+                graphic = int(width / ratio);
+                for (i=0; i < graphic; i++) {
+                    printf "#";
+                }
+                printf "\n";
+            }
+        }
+    }' | sort
     exit 0
 }
 
 age()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," '{
+    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$1 -v width=$2 '{
             if(0 <= $3 && $3 <= 5) {
-                count1++;
+                age["0-5"] += 1;
             }
             else if(6 <= $3 && $3 <= 15) {
-                count2++;
+                age["6-15"] += 1;
             }
             else if(16 <= $3 && $3 <= 25) {
-                count3++;
+                age["16-25"] += 1;
             }
             else if(26 <= $3 && $3 <= 35) {
-                count4++;
+                age["26-35"] += 1;
             }
             else if(36 <= $3 && $3 <= 45) {
-                count5++;
+                age["36-45"] += 1;
             }
             else if(46 <= $3 && $3 <= 55) {
-                count6++;
+                age["46-55"] += 1;
             }
             else if(56 <= $3 && $3 <= 65) {
-                count7++;
+                age["56-65"] += 1;
             }
             else if(66 <= $3 && $3 <= 75) {
-                count8++;
+                age["66-75"] += 1;
             }
             else if(76 <= $3 && $3 <= 85) {
-                count9++;
+                age["76-85"] += 1;
             }
             else if(86 <= $3 && $3 <= 95) {
-                count10++;
+                age["86-95"] += 1;
             }
             else if(96 <= $3 && $3 <= 105) {
-                count11++;
+                age["96-105"] += 1;
             }
             else if($3 >= 105) {
-                count12++;
+                age[">105"] += 1;
             }
             else {
-                count13++;
+                age["None"] += 1;
             }
         }
         END {
-            print "0-5\t: " count1;
-            print "6-15\t: " count2;
-            print "16-25\t: " count3;
-            print "26-35\t: " count4;
-            print "36-45\t: " count5;
-            print "46-55\t: " count6;
-            print "56-65\t: " count7;
-            print "66-75\t: " count8;
-            print "76-85\t: " count9;
-            print "86-95\t: " count10;
-            print "96-105\t: " count11;
-            print ">105\t: " count12;
-            print "None\t: " count13;
+            if (graph) {
+                if (width == "") {
+                    for (i in age) {
+                        printf i"\t: ";
+                        modulo = age[i] % 10000;
+                        graphic = int((age[i] - modulo)/10000);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                }
+                else {
+                    max = 0;
+                    for (i in age) {
+                        if (age[i] > max) {
+                            max = age[i];
+                        }
+                    }
+                    for (i in age) {
+                        printf i"\t: ";
+                        ratio = max / age[i];
+                        graphic = int(width / ratio);
+                        for (i=0; i < graphic; i++) {
+                            printf "#";
+                        }
+                        printf "\n";
+                    }
+                }
+            }
+            else {
+                for (i in age) {
+                    print i"\t: " age[i]; 
+                }
+            }
         }
-    '
+    ' | sort
     exit 0
 }
 
@@ -160,7 +235,7 @@ daily()
 
 daily_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
         {
             day=substr($2, 1, 10);
             days[day] += 1;
@@ -220,7 +295,7 @@ monthly()
 
 monthly_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
         {
             month=substr($2, 1, 7);
             months[month] += 1;
@@ -280,7 +355,7 @@ yearly()
 
 yearly_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
         {
             year=substr($2, 1, 4);
             years[year] += 1;
@@ -344,7 +419,7 @@ countries()
 
 countries_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
         {
             countries[$8] += 1;
         }
@@ -432,7 +507,7 @@ districts()
 
 districts_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
         {
             districts[$6] += 1;
         }
@@ -514,7 +589,7 @@ regions()
 
 regions_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v graph=$GRAPH -v width=$WIDTH '
+    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
         {
             regions[$5] += 1;
         }
@@ -578,11 +653,14 @@ validate_input()
 {
     INPUT=$(echo "$INPUT" | sed '/^[[:space:]]*$/d' | sed 's/ //g' |
     awk -F "," '{
+        year=substr($2, 1, 4);
+        year_dash=substr($2, 1, 5);
         month=substr($2, 6, 7);
+        month_dash=substr($2, 6, 8);
         day=substr($2, 9, 10);
         if ($2 == "datum" && $3 == "vek") {print;}
         else if ($3 ~ /^[0-9]*$/) {
-            if ((substr($2, 1, 5) ~ /202[0-2]-/) && (substr($2, 6, 8) ~ /0[1-9]|1[0-2]-/)) {
+            if ((year_dash ~ /202[0-2]-/) && (substr($2, 6, 8) ~ /0[1-9]|1[0-2]-/)) {
                 if (month ~ /0[1,3,5,7,8]|1[0,2]/ &&
                     day ~ /0[1-9]|1[0-9]|2[0-9]|3[0-1]/) {
                         print;
@@ -592,7 +670,7 @@ validate_input()
                         print;
                 }
                 else if (month ~ /02/) {
-                    if (substr($2, 1, 4) ~ /2020/ && day ~ /0[1-9]|1[0-9]|2[0-9]/) {
+                    if (year ~ /2020/ && day ~ /0[1-9]|1[0-9]|2[0-9]/) {
                         print;
                     }
                     else if (day ~ /0[1-9]|1[0-9]|2[0-8]/) {
@@ -626,7 +704,8 @@ do
             INPUT=$(bzcat $BZ2_FILES);;
         *.csv) CSV_FILES=$OPT
             INPUT=$(cat $CSV_FILES);;
-        -h) usage;;
+        -h) usage
+            exit 0;;
         *) continue;;
     esac
 done
@@ -642,15 +721,22 @@ do  case "$FILTER" in
         a) filter_date_after $OPTARG;;
         b) filter_date_before $OPTARG;;
         g) filter_gender $OPTARG;;
-        h) usage;;
+        h) usage
+            exit 0;;
         s) eval "OPTARG=\${$OPTIND}"
+            zero=0;
+            if [ $OPTARG -le $zero ]; then
+                usage >&2
+                exit 1
+            fi
             case "$OPTARG" in
                 [0-9]*)  ((OPTIND++));;
                 *)  OPTARG="";;
             esac
             GRAPH="true"
             WIDTH=$OPTARG;;
-        *) usage >&2;;
+        *) usage >&2
+            exit 1;;
     esac
 done
 
@@ -663,12 +749,12 @@ do
     case "$OPT" in
         infected) infected;;
         merge) merge;;
-        gender) gender;;
-        age) if [ -n "$GRAPH" ]; then
-                daily_graphic $WIDTH
+        gender) if [ -n "$GRAPH" ]; then
+                gender_graphic $WIDTH
             else
-                daily
+                gender
             fi;;
+        age) age $GRAPH $WIDTH;;
         daily) if [ -n "$GRAPH" ]; then
                     daily_graphic $WIDTH
                 else
@@ -700,7 +786,8 @@ do
                     regions
                 fi;;
         *.csv | *.gz | *.bz2) ;;
-        *) usage >&2;;
+        *) usage >&2
+            exit 1;;
     esac
 done
 
