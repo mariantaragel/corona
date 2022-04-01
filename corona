@@ -1,4 +1,4 @@
-#! /usr/bin/bash
+#! /bin/bash
 
 # File: corona
 # Author: Marián Tarageľ
@@ -227,7 +227,7 @@ age()
 
 age_graphic()
 {
-    echo "$INPUT" | sed '1d' | sort -t "," -k 3 -n | awk -F "," -v width=$2 '
+    echo "$INPUT" | sed '1d' | sort -t "," -k 3 -n | awk -F "," -v width=$1 '
         {
             if(0 <= $3 && $3 <= 5) {
                 age["0-5"] += 1;
