@@ -32,55 +32,54 @@ usage()
     -h - vypíše nápovědu s krátkým popisem každého příkazu a přepínače"
 }
 
-filter_gender()
-{
-    INPUT=$(echo "$INPUT" | awk -F "," -v GENDER="$1" '{
-        if (NR == 1) {
-            print $0;
-        }
-        if ($4 == GENDER) {
-            print $0;
-        }
-    }')
-}
-
 filter_date_after()
 {
-    INPUT=$(echo "$INPUT" | awk -F "," -v DATE="$1" '{
-        if(DATE <= $2) {
-            print $0;
+    INPUT="eval $INPUT | awk -F "," -v DATE="$1" '{
+        if(DATE <= \$2) {
+            print \$0;
         }
-    }')
+    }'"
 }
 
 filter_date_before()
 {
-    INPUT=$(echo "$INPUT" | awk -F "," -v DATE="$1" '{
-        if(DATE >= $2) {
-            print $0;
+    INPUT="eval $INPUT | awk -F "," -v DATE="$1" '{
+        if(DATE >= \$2) {
+            print \$0;
         }
-    }')
+    }'"
+}
+
+filter_gender()
+{
+    INPUT="eval $INPUT | awk -F "," -v GENDER="$1" '{
+        if (NR == 1) {
+            print \$0;
+        }
+        if (\$4 == GENDER) {
+            print \$0;
+        }
+    }'"
 }
 
 infected()
 {
-    COUNT_INFECTED=$(echo "$INPUT" | sed '1d' | wc -l)
-    echo "$COUNT_INFECTED"
+    eval $INPUT | sed '1d' | wc -l
     exit 0
 }
 
 merge()
 {
-    INPUT=$(echo "$INPUT" | sed '1d')
     echo "id,datum,vek,pohlavi,kraj_nuts_kod,okres_lau_kod,nakaza_v_zahranici,nakaza_zeme_csu_kod,reportovano_khs"
+    INPUT="eval $INPUT | sed '1d'"
     if [ -n "$INPUT" ]; then
-        echo "$INPUT"
+        eval $INPUT
     fi
 }
 
 gender()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," '
+    eval $INPUT | sed '1d' | awk -F "," '
     {
         if ($4 == "M") {
             men++;
@@ -104,7 +103,7 @@ gender()
 
 gender_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
+    eval $INPUT | sed '1d' | awk -F "," -v width=$1 '
     {
         gender[$4] += 1;
     }
@@ -165,7 +164,7 @@ gender_graphic()
 
 age()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," '{
+    eval $INPUT | sed '1d' | awk -F "," '{
             if(0 <= $3 && $3 <= 5) {
                 age[0] += 1;
             }
@@ -207,19 +206,19 @@ age()
             }
         }
         END {
-            print "0-5\t: "age[0];
-            print "6-15\t: "age[1];
-            print "16-25\t: "age[2];
-            print "26-35\t: "age[3];
-            print"36-45\t: "age[4];
-            print "46-55\t: "age[5];
-            print "56-65\t: "age[6];
-            print "66-75\t: "age[7];
-            print "76-85\t: "age[8];
-            print "86-95\t: "age[9];
-            print "96-105\t: "age[10];
-            print ">105\t: "age[11];
-            print "None\t: "age[12];
+            printf ("%-6s: %d\n", "0-5", age[0]);
+            printf ("%-6s: %d\n", "6-15", age[1]);
+            printf ("%-6s: %d\n", "16-25", age[2]);
+            printf ("%-6s: %d\n", "26-35", age[3]);
+            printf ("%-6s: %d\n", "36-45", age[4]);
+            printf ("%-6s: %d\n", "46-55", age[5]);
+            printf ("%-6s: %d\n", "56-65", age[6]);
+            printf ("%-6s: %d\n", "66-75", age[7]);
+            printf ("%-6s: %d\n", "76-85", age[8]);
+            printf ("%-6s: %d\n", "86-95", age[9]);
+            printf ("%-6s: %d\n", "96-105", age[10]);
+            printf ("%-6s: %d\n", ">105", age[11]);
+            printf ("%-6s: %d\n", "None", age[12]);
         }
     '
     exit 0
@@ -227,7 +226,7 @@ age()
 
 age_graphic()
 {
-    echo "$INPUT" | sed '1d' | sort -t "," -k 3 -n | awk -F "," -v width=$1 '
+    eval $INPUT | sed '1d' | sort -t ',' -k 3,3 -n -s| awk -F "," -v width=$1 '
         {
             if(0 <= $3 && $3 <= 5) {
                 age["0-5"] += 1;
@@ -272,7 +271,7 @@ age_graphic()
         END {
             if (width == "") {
                 for (i in age) {
-                    printf i"\t: ";
+                    printf ("%-6s: ", i);
                     modulo = age[i] % 10000;
                     graphic = int((age[i] - modulo)/10000);
                     for (i=0; i < graphic; i++) {
@@ -289,7 +288,7 @@ age_graphic()
                     }
                 }
                 for (i in age) {
-                    printf i"\t: ";
+                    printf ("%-6s: ", i);
                     ratio = max / age[i];
                     graphic = int(width / ratio);
                     for (i=0; i < graphic; i++) {
@@ -299,13 +298,13 @@ age_graphic()
                 }
             }
         }
-    '
+    ' | sort -s
     exit 0
 }
 
 daily()
 {
-    echo "$INPUT" | sed '1d' | sort -t "," -k 2 | awk -F "," '
+    eval $INPUT | sed '1d' | sort -t "," -k 2 | awk -F "," '
         BEGIN { before="2020-03-01"; }
         {
             if ($2 == "") {
@@ -331,7 +330,7 @@ daily()
 
 daily_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
+    eval $INPUT | sed '1d' | awk -F "," -v width=$1 '
         {
             if ($2 == "") {
                 days["None"]++;
@@ -377,7 +376,7 @@ daily_graphic()
 
 monthly()
 {
-    echo "$INPUT" | sed '1d' | sort -t "," -k 2 | awk -F "," '
+    eval $INPUT | sed '1d' | sort -t "," -k 2 | awk -F "," '
         BEGIN { before="2020-03"; }
         {
             if ($2 == "") {
@@ -402,7 +401,7 @@ monthly()
 
 monthly_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
+    eval $INPUT | sed '1d' | awk -F "," -v width=$1 '
         {
             if ($2 == "") {
                 months["None"]++;
@@ -448,7 +447,7 @@ monthly_graphic()
 
 yearly()
 {
-    echo "$INPUT" | sed '1d' | sort -t "," -k 2 | awk -F "," '
+    eval $INPUT | sed '1d' | sort -t "," -k 2 | awk -F "," '
         BEGIN { before="2020"; }
         {
             if ($2 == "") {
@@ -474,7 +473,7 @@ yearly()
 
 yearly_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
+    eval $INPUT | sed '1d' | awk -F "," -v width=$1 '
         {
             if ($2 == "") {
                 years["None"]++;
@@ -520,7 +519,7 @@ yearly_graphic()
 
 countries()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," '
+    eval $INPUT | sed '1d' | awk -F "," '
         {
             countries[$8] += 1;
         }
@@ -530,7 +529,7 @@ countries()
                     continue;
                 }
                 else if (i == "") {
-                    print "None: "countries[i];
+                    continue;
                 }
                 else {
                     print i": "countries[i];
@@ -543,24 +542,17 @@ countries()
 
 countries_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
+    eval $INPUT | sed '1d' | awk -F "," -v width=$1 '
         {
-            countries[$8] += 1;
+            if ($8 != "") {
+                countries[$8] += 1;
+            }
         }
         END {
             if (width == "") {
                 for (i in countries) {
                     if (i == "CZ") {
                         continue;
-                    }
-                    else if (i == "") {
-                        printf "None: ";
-                        modulo = countries[i] % 100;
-                        graphic = int((countries[i] - modulo)/100);
-                        for (i=0; i < graphic; i++) {
-                            printf "#";
-                        }
-                        printf "\n";
                     }
                     else {
                         printf i": ";
@@ -584,15 +576,6 @@ countries_graphic()
                     if (i == "CZ") {
                         continue;
                     }
-                    else if (i == "") {
-                        printf "None: ";
-                        ratio = max / countries[i];
-                        graphic = int(width / ratio);
-                        for (i=0; i < graphic; i++) {
-                            printf "#";
-                        }
-                        printf "\n";
-                    }
                     else{
                         printf i": ";
                         ratio = max / countries[i];
@@ -611,7 +594,7 @@ countries_graphic()
 
 districts()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," '
+    eval $INPUT | sed '1d' | awk -F "," '
         {
             districts[$6] += 1;
         }
@@ -631,7 +614,7 @@ districts()
 
 districts_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
+    eval $INPUT | sed '1d' | awk -F "," -v width=$1 '
         {
             districts[$6] += 1;
         }
@@ -693,7 +676,7 @@ districts_graphic()
 
 regions()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," '
+    eval $INPUT | sed '1d' | awk -F "," '
         {
             regions[$5] += 1;
         }
@@ -713,7 +696,7 @@ regions()
 
 regions_graphic()
 {
-    echo "$INPUT" | sed '1d' | awk -F "," -v width=$1 '
+    eval $INPUT | sed '1d' | awk -F "," -v width=$1 '
         {
             regions[$5] += 1;
         }
@@ -775,35 +758,7 @@ regions_graphic()
 
 validate_input()
 {
-    INPUT=$(echo "$INPUT" | sed '/^[[:space:]]*$/d' | sed 's/ //g' |
-    awk -F "," '{
-        year=int(substr($2, 1, 4));
-        month=int(substr($2, 6, 7));
-        day=int(substr($2, 9, 10));
-        if ($2 == "datum" && $3 == "vek") {print;}
-        else if ($3 ~ /^[0-9]*$/ || $2 == "") {
-            if ($2 ~ /^202[012][- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])$/ || $2 == "") {
-                if (month ~ /([13578]|1[02])/ && day ~ /([1-9]|1[0-9]|2[0-9]|3[01])/ || $2 == "") {
-                    print;
-                }
-                else if (month ~ /([469]|11)/ && day ~ /([1-9]|1[0-9]|2[0-9]|3[0])/) {
-                    print;
-                }
-                else if (month ~ /(2)/ && day ~ /(^[1-9]$|1[0-9]|2[0-8])/) {
-                    print;
-                }
-                else {
-                    print "Invalid date: "$0 | "cat 1>&2";
-                }
-            }
-            else {
-                print "Invalid date: "$0 | "cat 1>&2";
-            }
-        }
-        else {
-            print "Invalid age: "$0 | "cat 1>&2";
-        }
-    }')
+    INPUT="eval $INPUT | sed '/^[[:space:]]*$/d' | sed 's/ //g'"
 }
 
 for (( OPTIND=1; OPTIND <= $#; OPTIND++))
@@ -811,18 +766,18 @@ do
     eval "OPT=\${$OPTIND}"
     case $OPT in
         *.gz) GZ_FILES=$OPT
-            INPUT=$(zcat "$GZ_FILES");;
+            INPUT="zcat $GZ_FILES";;
         *.bz2) BZ2_FILES=$OPT
-            INPUT=$(bzcat "$BZ2_FILES");;
+            INPUT="bzcat $BZ2_FILES";;
         *.csv) CSV_FILES=$OPT
-            INPUT=$(cat "$CSV_FILES");;
+            INPUT="cat $CSV_FILES";;
         -h) usage
             exit 0;;
         *) continue;;
     esac
 done
 if [[ "$INPUT" == "" ]];
-    then INPUT=$(cat)
+    then INPUT="cat"
 fi
 
 OPTIND=1
